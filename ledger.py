@@ -8,3 +8,5 @@
 # OUTPUT: a set of (value:public key) pairs
 # SIGNATURE: a set of cryptographic signatures on the TYPE, INPUT, and OUTPUT fields
 
+def generateUTP(filename):
+    pass
