@@ -5,6 +5,7 @@ import threading
 import binascii
 from Crypto.PublicKey import RSA
 from Crypto.Random import get_random_bytes
+from Crypto.Cipher import PKCS1_OAEP
 
 # Questions
 # 1. Are identities different from nodes? Should an identity be able to complete a transaction from any node?
@@ -12,6 +13,7 @@ from Crypto.Random import get_random_bytes
 # 3. Why are there 10 nodes? Are all the nodes verifying transactions?
 # 5. How should we go about adding new transactions to the UTP? If two transactions are related to one another, the later transaction should
 # not have the opportunity to be verified before its parent.
+# 6. what is the "value" in the output and why should a public key be associated with it?
 
 # *  -------------------------------- * #
 # *  Lab 4: Minimum Viable Blockchain * #
@@ -20,7 +22,7 @@ from Crypto.Random import get_random_bytes
 # TODO: Task I: Define a Transaction
 
 publicKeyDatabase = {}
-privateKeyDatabase = {} # meant to be inaccessable to the public 
+userbase = {} # meant to be inaccessable to the public 
 VTP = []
 
 class User:
@@ -36,7 +38,7 @@ def createUsers():
     for i in range(10):
         u = User(str(i))
         publicKeyDatabase[i] = u.pk
-        privateKeyDatabase[i] = u.sk
+        userbase[u.pk] = u
 
 
 
@@ -48,22 +50,21 @@ def verifySignature(msg, sig, pk):
 
 
 def verifyNode(ZCBlock):
-    nonce = 0
+    nonceTracker = set() 
 
-    while(ZCBlock not in VP):
+    while(ZCBlock not in VTP):
+        nonce = random.randrange(0, pow(2,31)-1)
+        if nonce in nonceTracker:
+            continue
+        nonceTracker.add(nonce)
+
         ZCBlock.nonce = nonce
         curHash = hex(hash(ZCBlock))
         print(curHash)
         
-        try:
-            if curHash <= 0x00000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF:
-                ZCBlock.PW = curHash
-                return ZCBlock
-        except:
-            pass
-
-        nonce += 1
-
+        if curHash <= 0x00000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF:
+            ZCBlock.PW = curHash
+            return ZCBlock
     return None
 
 
@@ -94,20 +95,4 @@ class myThread (threading.Thread):
         print(self.name + ' Transaction Chain:')
         print(self.transactionChain)
         print('---------------------------')
-
-
-
-
-# ! RUN PROGRAM ! #
-# Create the userbase
-createUsers()
-
-# Create the Unverified Transfer Pool
-UTP = generateUTP('transfers.txt')
-
-# Verify values in pool using 10 nodes
-for i in range(10):
-    c = myThread(i, "Thread " + i)
-    c.start()
-
 
