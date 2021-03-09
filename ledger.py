@@ -7,7 +7,7 @@ from Crypto.PublicKey import RSA
 from lab4 import User
 import time
 from Crypto.Cipher import PKCS1_OAEP
-
+import UTP
 # TODO: Task III: Transaction File
 
 # ! Object format:
@@ -17,48 +17,57 @@ from Crypto.Cipher import PKCS1_OAEP
 # OUTPUT: a set of (value:public key) pairs
 # SIGNATURE: a set of cryptographic signatures on the TYPE, INPUT, and OUTPUT fields
 
-UTP = None
+# UTP = None
 
 class ZCBLOCK:
     def __init__(self, transactionID = None, transactionType = None, _input = None, _output = None, signatures = None, prevs = None, nonce = None, PW = None):
         self.transactionID = transactionID
         self.transactionType = transactionType
-        self._input = _input
+        self._input = _input # [[public_key1,output_id1,secretkey1],[...],...] last one is who receives the money
         self._output = _output # {value:ID}
         self.signature = signatures # [sig1, sig2, ..., sigN]
-        self.prevs = prevs # need?
+        self.prevs = prevs 
         self.nonce = None 
         self.PW = PW 
 
+    def __repr__(self):
+        final = "Transaction " + str(self.transactionID) + " with nonce " + self.nonce + "\n"
+        for key in self._output:
+            final += "\t" + str(key) + " gets " + self._output[key] + "\n"
+        return final
 
 def generateTransfers():
-    types = ["GENESIS, ""TRANSFER", "TRANSFER", "TRANSFER", "TRANSFER", \
-        "MERGE", "JOIN", "TRANSFER", "JOIN", "MERGE", "TRANSFER"]
+    types = ["GENESIS", "TRANSFER", "TRANSFER", "TRANSFER", "TRANSFER", \
+        "MERGE", "JOIN", "TRANSFER", "JOIN", "MERGE"]
 
-    inputs = ["a", "a", "a", "a", "a", "a", "a", "a", "a", "a"]
+    inputs = ["", "pk:ID:sk", "pk:ID:sk", "pk:ID:sk", "pk:ID:sk", "pk:ID:sk pk:ID:sk", "pk:ID:sk", "pk:ID:sk", "pk:ID:sk", "pk:ID:sk"]
 
     outputs = ["25:ID_1", "15:ID_2 10:ID_1", "3:ID_3 12:ID_2", "1:ID_4 2:ID_3",\
-        "2.15:ID_4 7.85:ID_1", "MERGE", "JOIN", "2:ID_4 10:ID_2", "JOIN", "MERGE", "0.85:ID_3 7:ID_1"]
+        "2.15:ID_4 7.85:ID_1", "25:ID_1 25:ID_1", "25:ID_1 25:ID_1", "2:ID_4 10:ID_2", "2:ID_4 10:ID_2", "2:ID_4 10:ID_2", "0.85:ID_3 7:ID_1"]
 
-    parties = [[], ["1"], ["2"], ["3"], ["1"], ["1", "2"], ["3","4"], ["2"], ["1", "3"], ["2", "4"], ["1"]]
+    uk = [u for u in userbase.keys()]
+    parties = [[], [uk[0]], [uk[1]], [uk[2]], [(uk[0])], [uk[0], uk[1]], [uk[2],uk[3]], [uk[1]], [uk[0], uk[2]], [uk[1], uk[3]], [uk[0]]]
 
     result = ""
     for i in range(len(types)):
         signatures = []
         for p in parties[i]:
-            signatures.append(generateSignature(inputs[i], outputs[i], types[i], p))
+            tmp = generateSignature(inputs[i], outputs[i], types[i], p)
+            signatures.append(tmp)
 
-        IDVals = inputs[i] + outputs[i]
+        IDVals = str.encode(inputs[i]) + str.encode(outputs[i])
         
         for s in signatures:
-            IDVals += s
+            if s is not None:
+                IDVals += s
         
-        transactionID = str(hex(hash(IDVals)))[2:]
+        transactionID = str(hex(hash(IDVals)))
         result += transactionID + "\n" + types[i] + "\n" + inputs[i] + "\n"\
             + outputs[i] + "\n"
         
         for s in signatures:
-            result += s + " "
+            if s is not None:
+                result += "temp" + " "
 
         result += "\n\n" 
         
@@ -87,8 +96,12 @@ def generateUTP(filename):
         newZCBlock.transactionID = int(flines[i].strip('\n'), 16)
         newZCBlock.transactionType = flines[i+1].strip('\n')
 
-        # input
-        inputString = flines[i+2] #!!!! have to decide formatting (asking professor) 
+        # input user_public_key:output_id:secret_key
+        inputString = flines[i+2]
+        input_list = []
+        for userinput in inputString.split(" "):
+            input_list.append(userinput.split(":"))
+        newZCBlock._input = input_list
         
         # output
         outputStrings = flines[i+3].strip('\n').split(' ')
@@ -147,19 +160,29 @@ def generateUTP(filename):
     return UTP
 
 
-def transfer(giver: User, reciever: User, send_amount: float, prior_block: Output):
-    total_amount = prior_block.get_value(giver.private_key)
+def verify_transfer(giver: User, send_amount: float, prior_block: Output):
+    total_amount = prior_block.check_value(giver.private_key)
+    if total_amount == None:
+        raise Exception("No funds for the user exist with this block.")
     if total_amount < send_amount:
         raise Exception("Insufficient funds")
+
+def run_transfer(giver: User, reciever: User, send_amount: float, prior_block: Output):
+    total_amount = prior_block.get_value(giver.private_key)
     giver_output_amount = total_amount - send_amount
     return Output([giver_output_amount, send_amount], [giver.private_key, reciever.private_key])
 
-def merge(giver: User, reciever: User, send_amount: float, prior_blocks: list):
+def verify_merge(giver: User, send_amount: float, prior_blocks: list):
+    total_amount = 0
+    for i in range(len(prior_blocks)):
+        total_amount += prior_blocks[i].check_value(giver.private_key)
+    if total_amount < send_amount:
+        raise Exception("Insufficient funds")
+    
+def run_merge(giver: User, reciever: User, send_amount: float, prior_blocks: list):
     total_amount = 0
     for i in range(len(prior_blocks)):
         total_amount += prior_blocks[i].get_value(giver.private_key)
-    if total_amount < send_amount:
-        raise Exception("Insufficient funds")
     giver_output_amount = total_amount - send_amount
     return Output([giver_output_amount, send_amount], [giver.private_key, reciever.private_key])
 
@@ -169,24 +192,31 @@ reciever: the identity who the transaction is directed towards
 send_amounts: the total amount that each giver will be contributing
 prior_blocs: 2d list- each item is a list of prior_blocks that each user will be using
 '''
-def join(givers: list, receiver: User, send_amounts: list, total_send_amount: float, prior_blocks: list):
-    #check that the send amounts match the total send amount
+def verify_join(givers: list, send_amounts: list, total_send_amount: float, prior_blocks: list):
     if sum(send_amounts) != total_send_amount:
-        raise Exception("Unbalenced transfer of funds.")
-    # Calculate the sum of the provided blocks and calculate the remaining amounts for each giver
+        raise Exception("Unbalanced transfer of funds.")
+    remaining_amounts = [0]*len(givers)
+    actual_total_amount = 0
+    for giver in range(len(givers)):
+        giver_total = 0
+        for pBlock in range(len(prior_blocks[giver])):
+            giver_total += prior_blocks[giver][pBlock].check_value(givers[giver].private_key)
+        if giver_total < send_amounts[giver]:
+            raise Exception("Giver at index "+str(giver)+" has not provided the necessary funds.")
+        actual_total_amount += giver_total
+        remaining_amounts[giver] = giver_total - send_amounts[giver]
+    if actual_total_amount < total_send_amount:
+        raise Exception("Insufficent total funds provided")
+
+def run_join(givers: list, receiver: User, send_amounts: list, total_send_amount: float, prior_blocks: list):
     remaining_amounts = [0]*len(givers)
     actual_total_amount = 0
     for giver in range(len(givers)):
         giver_total = 0
         for pBlock in range(len(prior_blocks[giver])):
             giver_total += prior_blocks[giver][pBlock].get_value(givers[giver].private_key)
-        if giver_total < send_amounts[giver]:
-            raise Exception("Giver at index "+str(giver)+" has not provided the necessary funds.")
         actual_total_amount += giver_total
         remaining_amounts[giver] = giver_total - send_amounts[giver]
-    # make sure that the actual total amount is sufficient
-    if actual_total_amount < total_send_amount:
-        raise Exception("Insufficent total funds provided")
     return Output(remaining_amounts+[total_send_amount], [giver.private_key for giver in givers]+[receiver.private_key])
 
 

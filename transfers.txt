@@ -1,30 +1,60 @@
+0x2faf1480c3b4a8c9
 GENESIS
-NULL
-0 25
 
+25:ID_1
+
+
+-0x68bfa9badbc27e68
 TRANSFER
-signature
-1 11 0 14
+pk:ID:sk
+15:ID_2 10:ID_1
+temp 
 
+0x4fa3ebac87487025
 TRANSFER
-1[0]
-1 8 2 3
+pk:ID:sk
+3:ID_3 12:ID_2
+temp 
 
+0x7b2dbd4647c55c64
 TRANSFER
-1[1]
-0 7 2 7
+pk:ID:sk
+1:ID_4 2:ID_3
+temp 
 
+-0x780ea0111439bd19
 TRANSFER
-2[0]
+pk:ID:sk
+2.15:ID_4 7.85:ID_1
+temp 
 
-NUMBER: 
-TYPE: 
-INPUT: 
-OUTPUT: 
-SIGNATURE: 
+0x18fccfde4d8fb019
+MERGE
+pk:ID:sk pk:ID:sk
+25:ID_1 25:ID_1
+temp temp 
 
-a0s9df8612345
+0x26912c746e19999c
+JOIN
+pk:ID:sk
+25:ID_1 25:ID_1
+temp temp 
+
+-0x7de6c9a39b3aa736
 TRANSFER
+pk:ID:sk
+2:ID_4 10:ID_2
+temp 
 
-0.0126:fj89014h5la 1.28592:asoiehqgokn
-p19384hfkjasdf91024fj a1231ahymet
+-0x5ae5ba14f371e169
+JOIN
+pk:ID:sk
+2:ID_4 10:ID_2
+temp temp 
+
+0x440b5ff00e3d1a8c
+MERGE
+pk:ID:sk
+2:ID_4 10:ID_2
+temp temp 
+

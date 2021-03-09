@@ -6,6 +6,7 @@ import binascii
 from Crypto.PublicKey import RSA
 from Crypto.Random import get_random_bytes
 from Crypto.Cipher import PKCS1_OAEP
+import UTP
 
 # Questions
 # 1. Are identities different from nodes? Should an identity be able to complete a transaction from any node?
@@ -19,6 +20,13 @@ from Crypto.Cipher import PKCS1_OAEP
 # *  Lab 4: Minimum Viable Blockchain * #
 # *  -------------------------------- * #
 
+'''
+TODO:
+- split the transfer() merge() and join() functions so that it verifies transactions in one function
+    and then runs the transaction in another
+- there needs to be a place that runs the transactions as described above
+'''
+
 # TODO: Task I: Define a Transaction
 
 publicKeyDatabase = {}
@@ -29,8 +37,11 @@ class User:
     def __init__(self, pw):
         self.pw = pw
         key = RSA.generate(2048)
-        self.sk = key.export_key(passphrase=pw, pkcs=8, protection="scryptAndAES128-CBC")
-        self.pk = key.publickey().export_key()
+        self.sk = key
+        #self.skHash = key.export_key(passphrase=pw, pkcs=8, protection="scryptAndAES128-CBC")
+        #self.pk = key.publickey().export_key()
+        self.pk = key.publickey()
+        self.keyHash = key.publickey().export_key()
         self.wallet = []
 
 
@@ -38,7 +49,7 @@ def createUsers():
     for i in range(10):
         u = User(str(i))
         publicKeyDatabase[i] = u.pk
-        userbase[u.pk] = u
+        userbase[u.keyHash] = u
 
 
 
@@ -77,8 +88,10 @@ class myThread (threading.Thread):
         self.transactionChain = None
 
     def run(self):
+        public UTP
+        public VTP
         print(self.name + ' running...')
-        while(len(UTP) > 0):
+        while(len(VTP) < 10):
             choice = random.randrange(0,len(UTP))
             try:
                 verifiedBlock = verifyNode(UTP[choice])
@@ -92,7 +105,10 @@ class myThread (threading.Thread):
     
 
     def printChain(self):
-        print(self.name + ' Transaction Chain:')
-        print(self.transactionChain)
+        print(self.name + "'s Transaction Chain:")
+        temp = self.transactionChain
+        while temp != None:
+            print(temp)
+            temp = temp.prevs
         print('---------------------------')
 
