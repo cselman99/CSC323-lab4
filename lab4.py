@@ -6,7 +6,8 @@ import binascii
 from Crypto.PublicKey import RSA
 from Crypto.Random import get_random_bytes
 from Crypto.Cipher import PKCS1_OAEP
-import UTP
+import GlobalDB
+import Output
 
 # Questions
 # 1. Are identities different from nodes? Should an identity be able to complete a transaction from any node?
@@ -22,34 +23,22 @@ import UTP
 
 '''
 TODO:
-- split the transfer() merge() and join() functions so that it verifies transactions in one function
-    and then runs the transaction in another
-- there needs to be a place that runs the transactions as described above
+- there needs to be a place that runs run merge join 
 '''
 
 # TODO: Task I: Define a Transaction
 
-publicKeyDatabase = {}
-userbase = {} # meant to be inaccessable to the public 
-VTP = []
 
-class User:
-    def __init__(self, pw):
-        self.pw = pw
-        key = RSA.generate(2048)
-        self.sk = key
-        #self.skHash = key.export_key(passphrase=pw, pkcs=8, protection="scryptAndAES128-CBC")
-        #self.pk = key.publickey().export_key()
-        self.pk = key.publickey()
-        self.keyHash = key.publickey().export_key()
-        self.wallet = []
-
+# VTP = []
+VTP = GlobalDB.VTP
+UTP = GlobalDB.UTP
 
 def createUsers():
     for i in range(10):
-        u = User(str(i))
-        publicKeyDatabase[i] = u.pk
-        userbase[u.keyHash] = u
+        u = GlobalDB.User(str(i))
+        GlobalDB.publicKeyDatabase[i] = u.pk
+        GlobalDB.userbase[u.keyHash] = u
+        GlobalDB.compressedUB[i] = u
 
 
 
@@ -78,6 +67,26 @@ def verifyNode(ZCBlock):
             return ZCBlock
     return None
 
+def verify_transaction(zcblock):
+    output_list = []
+    if zcblock.transactionType != "GENESIS":
+        for output in zcblock.output_IDs:
+            output_list.append(VTP[output].outputBlock)
+    if zcblock.transactionType == "GENESIS":
+        # zcblock.outputBlock = Output(zcblock.amounts, [compressedUB[zcblock.users[0]]])
+        pass
+    elif zcblock.transactionType == "TRANSFER":
+        ledger.verify_transfer(GlobalDB.compressedUB[zcblock.users[0]], zcblock.amounts[0], output_list[0])
+    elif zcblock.transactionType == "MERGE":
+        ledger.run_merge(GlobalDB.compressedUB[zcblock.users[0]], zcblock.amounts[-1], output_list)
+    elif zcblock.transactionType == "JOIN":
+        givers = []
+        for i in range(len(zcblock.users)-1):
+            givers.append(GlobalDB.compressedUB[zcblock.users[i]])
+        zcblock.outputBlock = ledger.run_join(givers, zcblock.amounts[:-1], zcblock.amounts[-1], output_list)
+    else:
+        raise Exception("Invalid transaction type: "+zcblock.transactionType)
+
 
 # TODO: Task II: Create Verifying Nodes
 class myThread (threading.Thread):
@@ -88,22 +97,45 @@ class myThread (threading.Thread):
         self.transactionChain = None
 
     def run(self):
-        public UTP
-        public VTP
         print(self.name + ' running...')
         while(len(VTP) < 10):
             choice = random.randrange(0,len(UTP))
             try:
+                verify_transaction(UTP[choice])
                 verifiedBlock = verifyNode(UTP[choice])
                 if verifiedBlock is not None:
                     UTP.remove(UTP[choice])
-                    VTP.append(verifiedBlock)
+                    self.process_transaction(verifiedBlock)
+                    VTP[verifiedBlock.transactionID] = verifiedBlock
             except:
                 pass
-
-        self.printChain()
+        
+        while(1):
+            if GlobalDB.printOrder == self.threadID:
+                self.printChain()
+                GlobalDB.printOrder += 1
+                break
     
-
+    def process_transaction(self, zcblock: ledger.ZCBLOCK):
+        output_list = []
+        if zcblock.transactionType != "GENESIS":
+            for output in zcblock.output_IDs:
+                output_list.append(VTP[output].outputBlock)
+        if zcblock.transactionType == "GENESIS":
+            zcblock.outputBlock = Output.Output(zcblock.amounts, [GlobalDB.compressedUB[zcblock.users[0]]])
+        elif zcblock.transactionType == "TRANSFER":
+            zcblock.outputBlock = ledger.run_transfer(GlobalDB.compressedUB[zcblock.users[0]], GlobalDB.compressedUB[zcblock.users[1]], zcblock.amounts[0], output_list[0])
+        elif zcblock.transactionType == "MERGE":
+            zcblock.outputBlock = ledger.run_merge(GlobalDB.compressedUB[zcblock.users[0]], GlobalDB.compressedUB[zcblock.users[1]], zcblock.amounts[-1], output_list)
+        elif zcblock.transactionType == "JOIN":
+            givers = []
+            for i in range(len(zcblock.users)-1):
+                givers.append(GlobalDB.compressedUB[zcblock.users[i]])
+            zcblock.outputBlock = ledger.run_join(givers, GlobalDB.compressedUB[zcblock.users[-1]], zcblock.amounts[:-1], zcblock.amounts[-1], output_list)
+        else:
+            raise Exception("Invalid transaction type: "+zcblock.transactionType)
+    
+    
     def printChain(self):
         print(self.name + "'s Transaction Chain:")
         temp = self.transactionChain

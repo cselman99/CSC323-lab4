@@ -10,6 +10,6 @@ ledger.generateTransfers()
 UTP = ledger.generateUTP('transfers.txt')
 
 # Verify values in pool using 10 nodes
-for i in range(10):
-    c = lab4.myThread(i, "Thread " + i)
-    c.start()
+#for i in range(10):
+#    c = lab4.myThread(i, "Thread " + i)
+#    c.start()

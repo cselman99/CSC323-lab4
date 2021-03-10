@@ -1,13 +1,15 @@
 import random
-from lab4 import userbase
 from Output import Output
 import binascii
 import hashlib
 from Crypto.PublicKey import RSA
-from lab4 import User
+from GlobalDB import User
 import time
 from Crypto.Cipher import PKCS1_OAEP
-import UTP
+from GlobalDB import UTP
+from GlobalDB import VTP
+from GlobalDB import userbase
+from GlobalDB import compressedUB
 # TODO: Task III: Transaction File
 
 # ! Object format:
@@ -18,15 +20,21 @@ import UTP
 # SIGNATURE: a set of cryptographic signatures on the TYPE, INPUT, and OUTPUT fields
 
 # UTP = None
+signatories = {}
 
 class ZCBLOCK:
     def __init__(self, transactionID = None, transactionType = None, _input = None, _output = None, signatures = None, prevs = None, nonce = None, PW = None):
         self.transactionID = transactionID
         self.transactionType = transactionType
-        self._input = _input # [[public_key1,output_id1,secretkey1],[...],...] last one is who receives the money
+        # self._input = _input # [[public_key1,output_id1,amount],[...],...,[public_keyN,NULL,receiving amount]] last one is who receives the money
+        self.users = [] # list of public keys [PART ONE OF INPUT]
+        self.output_IDs = [] # list of verified transaction IDs [PART TWO OF INPUT]
+        self.amounts = [] # list of ammounts to be paid (last one is value paid to last user) [PART THREE OF INPUT]
         self._output = _output # {value:ID}
         self.signature = signatures # [sig1, sig2, ..., sigN]
         self.prevs = prevs 
+        self.outputBlock = None
+
         self.nonce = None 
         self.PW = PW 
 
@@ -37,58 +45,99 @@ class ZCBLOCK:
         return final
 
 def generateTransfers():
+    uk = [u for u in compressedUB.keys()]
+
+    t = ["", "", "", "", "", "", "", "", "", ""]
+
     types = ["GENESIS", "TRANSFER", "TRANSFER", "TRANSFER", "TRANSFER", \
         "MERGE", "JOIN", "TRANSFER", "JOIN", "MERGE"]
 
-    inputs = ["", "pk:ID:sk", "pk:ID:sk", "pk:ID:sk", "pk:ID:sk", "pk:ID:sk pk:ID:sk", "pk:ID:sk", "pk:ID:sk", "pk:ID:sk", "pk:ID:sk"]
+    for b in range(10):
+        sIndex = 0
+        inputs = [
+            str(uk[0])+"::25",
+            str(uk[0])+":" + t[0] + ":15 " + str(uk[1])+"::15",
+            str(uk[1])+":" + t[1] + ":3 " + str(uk[2]) + "::3",
+            str(uk[2])+":" + t[2] + ":1 " + str(uk[3]) + "::1",
+            str(uk[0])+":" + t[1] + ":2.15 " + str(uk[3]) + "::2.15", 
+            str(uk[3])+":" + t[4] + ":2 " + str(uk[3]) + ":" + t[3] + ":1 " + str(uk[2]) + "::3",
+            str(uk[2])+":" + t[3] + ":2 " + str(uk[2]) + ":" + t[5] + ":2 " + str(uk[4]) + "::4",
+            str(uk[1])+":" + t[2] + ":6 " + str(uk[4]) + "::6",
+            str(uk[4])+":" + t[6] + ":4 " + str(uk[4]) + ":" + t[7] + ":6 " + str(uk[2]) + "::10",
+            str(uk[0])+":" + t[4] + ":7.85 " + str(uk[3]) + ":" + t[5] + ":0.15 " + str(uk[2]) + ":" + t[8] + ":10 " + str(uk[1]) + "::18"
+        ]
 
-    outputs = ["25:ID_1", "15:ID_2 10:ID_1", "3:ID_3 12:ID_2", "1:ID_4 2:ID_3",\
-        "2.15:ID_4 7.85:ID_1", "25:ID_1 25:ID_1", "25:ID_1 25:ID_1", "2:ID_4 10:ID_2", "2:ID_4 10:ID_2", "2:ID_4 10:ID_2", "0.85:ID_3 7:ID_1"]
-
-    uk = [u for u in userbase.keys()]
-    parties = [[], [uk[0]], [uk[1]], [uk[2]], [(uk[0])], [uk[0], uk[1]], [uk[2],uk[3]], [uk[1]], [uk[0], uk[2]], [uk[1], uk[3]], [uk[0]]]
-
-    result = ""
-    for i in range(len(types)):
-        signatures = []
-        for p in parties[i]:
-            tmp = generateSignature(inputs[i], outputs[i], types[i], p)
-            signatures.append(tmp)
-
-        IDVals = str.encode(inputs[i]) + str.encode(outputs[i])
+        outputs = [
+            "25:" + str(uk[0]), 
+            "15:" + str(uk[1]) + " 10:" + str(uk[0]), 
+            "3:" + str(uk[2]) + " 12:" + str(uk[1]), 
+            "1:" + str(uk[3]) + " 2:" + str(uk[2]),
+            "2.15:" + str(uk[3]) + " 7.85:" + str(uk[0]), 
+            "0.15:" + str(uk[3]) + " 3:" + str(uk[2]),
+            "4:" + str(uk[4]) + " 1:" + str(uk[2]),
+            "6:" + str(uk[4]) + " 6:" + str(uk[1]),
+            "10:" + str(uk[2]),
+            "18:" + str(uk[1])
+            ]
         
-        for s in signatures:
-            if s is not None:
-                IDVals += s
+        #endstate: uk[2] has 1 coin, uk[1] has 24 coins
         
-        transactionID = str(hex(hash(IDVals)))
-        result += transactionID + "\n" + types[i] + "\n" + inputs[i] + "\n"\
-            + outputs[i] + "\n"
-        
-        for s in signatures:
-            if s is not None:
-                result += "temp" + " "
+        parties = [[], [uk[0]], [uk[1]], [uk[2]], [uk[0]], [uk[3]], [uk[2]], [uk[1]], [uk[4]], [uk[0], uk[3], uk[2]]]
+        # UnicodeEncodeError: 'charmap' codec can't encode characters in position 86-87: character maps to <undefined>
+        result = ""
+        for i in range(len(types)):
+            signatures = []
+            for p in parties[i]:
+                tmp = generateSignature(inputs[i], outputs[i], types[i], p)
+                signatures.append(tmp)
 
-        result += "\n\n" 
-        
+            IDVals = str.encode(inputs[i]) + str.encode(outputs[i])
+            
+            for s in signatures:
+                if s is not None:
+                    IDVals += s
+            
+            transactionID = str(hex(hash(IDVals)))
+
+            if i == b:
+                t[b] = transactionID
+
+            result += t[i] + "\n" + types[i] + "\n" + inputs[i] + "\n"\
+                + outputs[i] + "\n"
+            
+            for s in signatures:
+                if s is not None:
+                    result += str(sIndex) + " "
+                    signatories[sIndex] = s
+                    sIndex +=1
+
+            result += "\n\n" 
+                
     f = open('transfers.txt', 'w')
     f.write(result)
     f.close()
 
-# generateTransfers()
 
 '''
 output_database = {}
 entry: output_identifier:Output object
 
-inputs: output_id1, output_id2, ..., outputidN
+inputs: output_id1:public_key:amount, output_id2, ..., outputidN
+
+
+outID: 10
+outID2: 7
+
+MERGE
+input: outID:pk:4 outID2:pk:6 NULL:pk:12 
+
 '''
 
 def generateUTP(filename):
     f = open(filename, "r")
     flines = f.read().split('\n')
     f.close()
-    UTP = []
+    # UTP = []
     for i in range(0, len(flines), 6):
         newZCBlock = ZCBLOCK()
         
@@ -100,8 +149,12 @@ def generateUTP(filename):
         inputString = flines[i+2]
         input_list = []
         for userinput in inputString.split(" "):
-            input_list.append(userinput.split(":"))
-        newZCBlock._input = input_list
+            # input_list.append(userinput.split(":"))
+            split_info = userinput.split(":")
+            newZCBlock.users.append(split_info[0])
+            newZCBlock.output_IDs.append(split_info[1])
+            newZCBlock.amounts.append(split_info[2])
+        # newZCBlock._input = input_list
         
         # output
         outputStrings = flines[i+3].strip('\n').split(' ')
@@ -112,51 +165,16 @@ def generateUTP(filename):
         newZCBlock._output = outputDict
         
         # signatures
-        signatures = flines[i+4].spit(' ')
+        signatures = flines[i+4].split(' ')
         newZCBlock.signature = [int(sig, 16) for sig in signatures]
+        # ValueError: invalid literal for int() with base 16: ''
 
         # previous block
         if i != 0:
             newZCBlock.prevs = UTP[len(UTP)]
 
-        # need to decide how inputs are defined before this is completed
-        # call these functions after they have been verified???
-        # if newZCBlock.transactionType == 'GENESIS':
-        #     pass
-        # elif newZCBlock.transactionType == 'TRANSFER':
-        #     transfer()
-        # elif newZCBlock.transactionType == 'MERGE':
-        #     merge()
-        # elif newZCBlock.transactionType == 'JOIN':
-        #     join()
-        # else:
-        #     raise Exception("Invalid transaction type: "+newZCBlock.transactionType)
-
-
-
         UTP.append(newZCBlock)
-        
-        
-        
-        
-    # lines = []
-    # for line in f.read:
-    #     lines.append(line)
-    # f.close()
-    # UTP = []
-    # for i in range(round(len(lines) / 4) + 0.5):
-    #     if lines[i * 4] == "TRANSFER\n":
-    #         #giver = users[UTP[int(lines[i * 4 + 1][0])].
-    #         u = userbase[]
-    #         transfer()
-    #     elif lines[i * 4] == "MERGE\n":
-    #         merge()
-    #     elif lines[i * 4] == "JOIN\n":
-    #         join()
-    #     elif i == 0 and lines[i * 4] == "GENESIS\n":
-    #         genesis()
-    #     randTime = random.random()
-    #     time.sleep(randTime * 2)
+    
     return UTP
 
 
@@ -219,8 +237,6 @@ def run_join(givers: list, receiver: User, send_amounts: list, total_send_amount
         remaining_amounts[giver] = giver_total - send_amounts[giver]
     return Output(remaining_amounts+[total_send_amount], [giver.private_key for giver in givers]+[receiver.private_key])
 
-
-
 def generateTransactionNumber(i, o, s):
     oRepr = str(o)
     sRepr = ''
@@ -241,14 +257,14 @@ def generateSignature(i, o, t, user):
         iRepr += m
     msg = iRepr + oRepr + t
 
-    if userbase.get(user) is None:
+    if compressedUB.get(user) is None:
+        print("none")
         return None
 
-    sk = userbase[user].sk
-    
+    sk = compressedUB[user].sk
     encryptor = PKCS1_OAEP.new(sk)
-    encrypted = encryptor.encrypt(msg)
-    print("Encrypted:", binascii.hexlify(encrypted))
+    encrypted = encryptor.encrypt(str.encode(msg))
+    # print("Encrypted:", binascii.hexlify(encrypted))
     return encrypted
 
 
