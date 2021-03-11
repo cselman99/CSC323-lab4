@@ -39,9 +39,12 @@ class ZCBLOCK:
         self.PW = PW 
 
     def __repr__(self):
-        final = "Transaction " + str(self.transactionID) + " with nonce " + self.nonce + "\n"
+        if self.nonce == None:
+            final = "Transaction " + str(self.transactionID) + " | " + self.transactionType + "\n"
+        else:
+            final = "Transaction " + str(self.transactionID) + " with nonce " + self.nonce + " | " + self.transactionType + "\n"
         for key in self._output:
-            final += "\t" + str(key) + " gets " + self._output[key] + "\n"
+            final += "\t" + self._output[key] + " gets " + str(key) + "\n"
         return final
 
 def generateTransfers():
@@ -102,7 +105,7 @@ def generateTransfers():
             if i == b:
                 t[b] = transactionID
 
-            result += t[i] + "\n" + types[i] + "\n" + inputs[i] + "\n"\
+            result += t[i] + "\n" + types[i] + "\n" + inputs[i] + "\n" \
                 + outputs[i] + "\n"
             
             for s in signatures:
@@ -142,6 +145,9 @@ def generateUTP(filename):
         newZCBlock = ZCBLOCK()
         
         # id and type
+        if flines[i].strip('\n') == '':
+            break
+
         newZCBlock.transactionID = int(flines[i].strip('\n'), 16)
         newZCBlock.transactionType = flines[i+1].strip('\n')
 
@@ -166,12 +172,15 @@ def generateUTP(filename):
         
         # signatures
         signatures = flines[i+4].split(' ')
-        newZCBlock.signature = [int(sig, 16) for sig in signatures]
+        if len(signatures) > 0 and signatures[0] != '':
+            newZCBlock.signature = [int(sig, 16) for sig in signatures if sig != '']
+        else:
+            newZCBlock.signature = None
         # ValueError: invalid literal for int() with base 16: ''
 
         # previous block
         if i != 0:
-            newZCBlock.prevs = UTP[len(UTP)]
+            newZCBlock.prevs = UTP[len(UTP)-1]
 
         UTP.append(newZCBlock)
     
