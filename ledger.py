@@ -47,6 +47,9 @@ class ZCBLOCK:
             final += "\t" + self._output[key] + " gets " + str(key) + "\n"
         return final
 
+    def __hash__(self):
+        return hash(str(self.transactionID) + self.transactionType + str(self.users) + str(self.signature) + str(self.nonce) )
+
 def generateTransfers():
     uk = [u for u in compressedUB.keys()]
 
@@ -153,14 +156,16 @@ def generateUTP(filename):
 
         # input user_public_key:output_id:secret_key
         inputString = flines[i+2]
-        input_list = []
         for userinput in inputString.split(" "):
-            # input_list.append(userinput.split(":"))
             split_info = userinput.split(":")
-            newZCBlock.users.append(split_info[0])
-            newZCBlock.output_IDs.append(split_info[1])
-            newZCBlock.amounts.append(split_info[2])
-        # newZCBlock._input = input_list
+            newZCBlock.users.append(int(split_info[0]))
+            outId = split_info[1]
+            if outId == '':
+                outId = 0
+            else:
+                outId = int(outId, 16)
+            newZCBlock.output_IDs.append(outId)
+            newZCBlock.amounts.append(float(split_info[2]))
         
         # output
         outputStrings = flines[i+3].strip('\n').split(' ')

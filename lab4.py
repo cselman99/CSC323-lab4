@@ -8,6 +8,8 @@ from Crypto.Random import get_random_bytes
 from Crypto.Cipher import PKCS1_OAEP
 import GlobalDB
 import Output
+import sys
+from Crypto.Hash import SHA256
 
 # Questions
 # 1. Are identities different from nodes? Should an identity be able to complete a transaction from any node?
@@ -50,19 +52,25 @@ def verifySignature(msg, sig, pk):
 
 
 def verifyNode(ZCBlock):
-    nonceTracker = set() 
+    nonceTracker = set()
+    print(ZCBlock)
 
     while(ZCBlock not in VTP):
-        nonce = random.randrange(0, pow(2,31)-1)
+        nonce = random.randrange(0, pow(2,256)-1)
         if nonce in nonceTracker:
             continue
         nonceTracker.add(nonce)
 
         ZCBlock.nonce = nonce
-        curHash = hex(hash(ZCBlock))
-        print(curHash)
+        zcbHash = (str(ZCBlock.transactionID) + ZCBlock.transactionType + str(ZCBlock.users) + str(ZCBlock.signature) + str(ZCBlock.nonce)).encode('utf-8')
+        m = SHA256.new()
+        m.update(zcbHash)
+        curHash = int(m.hexdigest(), 16)
         
-        if curHash <= 0x00000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF:
+        if curHash <= 0x00FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF:
+            print(hex(curHash))
+            #0x002a5c6c7ecaadcc9f58600618786c25cb461d990e74327aa1be64d4a98bbc0d
+            #0x00FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
             ZCBlock.PW = curHash
             return ZCBlock
     return None
@@ -70,20 +78,24 @@ def verifyNode(ZCBlock):
 def verify_transaction(zcblock):
     output_list = []
     if zcblock.transactionType != "GENESIS":
+        #print('not GENESIS')
         for output in zcblock.output_IDs:
             output_list.append(VTP[output].outputBlock)
     if zcblock.transactionType == "GENESIS":
-        # zcblock.outputBlock = Output(zcblock.amounts, [compressedUB[zcblock.users[0]]])
+        #print('GENESIS')
         pass
     elif zcblock.transactionType == "TRANSFER":
+        #print('TRANSFER')
         ledger.verify_transfer(GlobalDB.compressedUB[zcblock.users[0]], zcblock.amounts[0], output_list[0])
     elif zcblock.transactionType == "MERGE":
-        ledger.run_merge(GlobalDB.compressedUB[zcblock.users[0]], zcblock.amounts[-1], output_list)
+        #print('MERGE')
+        ledger.verify_merge(GlobalDB.compressedUB[zcblock.users[0]], zcblock.amounts[-1], output_list)
     elif zcblock.transactionType == "JOIN":
         givers = []
+        #print('JOIN')
         for i in range(len(zcblock.users)-1):
             givers.append(GlobalDB.compressedUB[zcblock.users[i]])
-        zcblock.outputBlock = ledger.run_join(givers, zcblock.amounts[:-1], zcblock.amounts[-1], output_list)
+        ledger.verify_join(givers, zcblock.amounts[:-1], zcblock.amounts[-1], output_list)
     else:
         raise Exception("Invalid transaction type: "+zcblock.transactionType)
 
@@ -99,18 +111,18 @@ class myThread (threading.Thread):
     def run(self):
         print(self.name + ' running...')
         while(len(VTP) < 10):
-            choice = random.randrange(0,len(UTP))
             try:
+                choice = random.randrange(0,len(UTP))
                 verify_transaction(UTP[choice])
                 verifiedBlock = verifyNode(UTP[choice])
                 if verifiedBlock is not None:
                     UTP.remove(UTP[choice])
                     self.process_transaction(verifiedBlock)
                     VTP[verifiedBlock.transactionID] = verifiedBlock
-            except:
+            except Exception as e:
                 pass
         
-        while(1):
+        while(True):
             if GlobalDB.printOrder == self.threadID:
                 self.printChain()
                 GlobalDB.printOrder += 1
