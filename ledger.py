@@ -42,7 +42,7 @@ class ZCBLOCK:
         if self.nonce == None:
             final = "Transaction " + str(self.transactionID) + " | " + self.transactionType + "\n"
         else:
-            final = "Transaction " + str(self.transactionID) + " with nonce " + self.nonce + " | " + self.transactionType + "\n"
+            final = "Transaction " + str(self.transactionID) + " with nonce " + str(self.nonce) + " | " + self.transactionType + "\n"
         for key in self._output:
             final += "\t" + self._output[key] + " gets " + str(key) + "\n"
         return final
@@ -166,7 +166,7 @@ def generateUTP(filename):
                 outId = int(outId, 16)
             newZCBlock.output_IDs.append(outId)
             newZCBlock.amounts.append(float(split_info[2]))
-        
+
         # output
         outputStrings = flines[i+3].strip('\n').split(' ')
         outputDict = {}
@@ -193,30 +193,35 @@ def generateUTP(filename):
 
 
 def verify_transfer(giver: User, send_amount: float, prior_block: Output):
-    total_amount = prior_block.check_value(giver.private_key)
+    print('1')
+    print(giver.sk)
+    total_amount = prior_block.check_value(giver.sk)
+    print('3')
     if total_amount == None:
+        print('no amount')
         raise Exception("No funds for the user exist with this block.")
     if total_amount < send_amount:
+        print('insufficient funds')
         raise Exception("Insufficient funds")
 
 def run_transfer(giver: User, reciever: User, send_amount: float, prior_block: Output):
-    total_amount = prior_block.get_value(giver.private_key)
+    total_amount = prior_block.get_value(giver.sk)
     giver_output_amount = total_amount - send_amount
-    return Output([giver_output_amount, send_amount], [giver.private_key, reciever.private_key])
+    return Output([giver_output_amount, send_amount], [giver.sk, reciever.sk])
 
 def verify_merge(giver: User, send_amount: float, prior_blocks: list):
     total_amount = 0
     for i in range(len(prior_blocks)):
-        total_amount += prior_blocks[i].check_value(giver.private_key)
+        total_amount += prior_blocks[i].check_value(giver.sk)
     if total_amount < send_amount:
         raise Exception("Insufficient funds")
     
 def run_merge(giver: User, reciever: User, send_amount: float, prior_blocks: list):
     total_amount = 0
     for i in range(len(prior_blocks)):
-        total_amount += prior_blocks[i].get_value(giver.private_key)
+        total_amount += prior_blocks[i].get_value(giver.sk)
     giver_output_amount = total_amount - send_amount
-    return Output([giver_output_amount, send_amount], [giver.private_key, reciever.private_key])
+    return Output([giver_output_amount, send_amount], [giver.sk, reciever.sk])
 
 '''
 givers: list of identities
@@ -232,7 +237,7 @@ def verify_join(givers: list, send_amounts: list, total_send_amount: float, prio
     for giver in range(len(givers)):
         giver_total = 0
         for pBlock in range(len(prior_blocks[giver])):
-            giver_total += prior_blocks[giver][pBlock].check_value(givers[giver].private_key)
+            giver_total += prior_blocks[giver][pBlock].check_value(givers[giver].sk)
         if giver_total < send_amounts[giver]:
             raise Exception("Giver at index "+str(giver)+" has not provided the necessary funds.")
         actual_total_amount += giver_total
@@ -246,10 +251,10 @@ def run_join(givers: list, receiver: User, send_amounts: list, total_send_amount
     for giver in range(len(givers)):
         giver_total = 0
         for pBlock in range(len(prior_blocks[giver])):
-            giver_total += prior_blocks[giver][pBlock].get_value(givers[giver].private_key)
+            giver_total += prior_blocks[giver][pBlock].get_value(givers[giver].sk)
         actual_total_amount += giver_total
         remaining_amounts[giver] = giver_total - send_amounts[giver]
-    return Output(remaining_amounts+[total_send_amount], [giver.private_key for giver in givers]+[receiver.private_key])
+    return Output(remaining_amounts+[total_send_amount], [giver.sk for giver in givers]+[receiver.sk])
 
 def generateTransactionNumber(i, o, s):
     oRepr = str(o)

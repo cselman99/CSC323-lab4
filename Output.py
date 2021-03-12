@@ -15,12 +15,15 @@ class Output:
     return final
   
   def check_value(self, key):
+      print(type(self.keys[0]))
+      print(key)
       for i in range(self.num_parties):
         if key == self.keys[i]:
           if self.active[i] == True:
             return self.values[i]
           else:
             return 0
+      print('returning none')
       return None
 
   def get_value(self, key):
@@ -32,4 +35,3 @@ class Output:
         else:
           raise Exception("Inactive block for user.")
     raise Exception("Invalid key for block.")
- 
