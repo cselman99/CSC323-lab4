@@ -15,16 +15,20 @@ class Output:
     return final
   
   def check_value(self, key):
-      print(type(self.keys[0]))
-      print(key)
-      for i in range(self.num_parties):
-        if key == self.keys[i]:
-          if self.active[i] == True:
-            return self.values[i]
-          else:
-            return 0
-      print('returning none')
-      return None
+    #print("length of keys"+str(len(self.keys)))
+    #print(self.keys)
+    #print(key)
+    #print(self.num_parties)
+    for i in range(self.num_parties):
+      if key == self.keys[i]:
+        #print('made it')
+        if self.active[i] == True:
+          #print(str(self.values[i]) + '\n')
+          return self.values[i]
+        else:
+          return 0
+    #print('returning none')
+    return None
 
   def get_value(self, key):
     for i in range(self.num_parties):

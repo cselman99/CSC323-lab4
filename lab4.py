@@ -67,7 +67,7 @@ def verifyNode(ZCBlock):
 
         # if curHash <= 0x00000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF:
         if curHash <=0x000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF:
-            print(curHash)
+            #print(curHash)
             # print("returning zcblock")
             # return ZCBlock
             return nonce, curHash
@@ -75,12 +75,23 @@ def verifyNode(ZCBlock):
     return None, None
 
 def verify_transaction(zcblock):
+    # print('verifying transaction')
     output_list = []
     #print("VTP: "+VTP)
     if zcblock.transactionType != "GENESIS":
         for output in zcblock.output_IDs[:-1]:
-            #print(output)
+            # print("output IDS:")
+            # print([hex(c) for c in zcblock.output_IDs])
+            # #['0x65fd319d552e9fd4', '0x49d7077a6192557a', '0x4211654c954883c8', '0x0']
+            # print("------------")
+        # for output in zcblock.output_IDs:
             output_list.append(GlobalDB.VTP[output].outputBlock)
+        output_list = [o for o in output_list if o is not None]
+        # print("Output:", output_list)
+        # print("transaction:", hex(zcblock.transactionID))
+        #Output: [Private RSA key at 0x1C2FC8637C0:7.85, Private RSA key at 0x1C2FC9062E0:2.15, Private RSA key at 0x1C2FC9062E0:0.1499999999999999, Private RSA key at 0x1C2FC9062E0:3.0, Private RSA key at 0x1C2FC906520:-4.0, Private RSA key at 0x1C2FC906520:10.0]
+        # transaction: 0x382cb270c1763a97
+        #[Private RSA key at 0x1844F25A790:7.85, Private RSA key at 0x1844F263FA0:2.15, Private RSA key at 0x1844F263FA0:0.1499999999999999, Private RSA key at 0x1844F263FA0:3.0, None]
 
     if zcblock.transactionType == "GENESIS":
         #print("verified")
@@ -91,12 +102,18 @@ def verify_transaction(zcblock):
         ledger.verify_transfer(GlobalDB.compressedUB[zcblock.users[0]], zcblock.amounts[0], output_list[0])
         #print('b')
     elif zcblock.transactionType == "MERGE":
+        #print('a')
         ledger.verify_merge(GlobalDB.compressedUB[zcblock.users[0]], zcblock.amounts[-1], output_list)
+        #print('b')
     elif zcblock.transactionType == "JOIN":
         givers = []
+        #print('d')
         for i in range(len(zcblock.users)-1):
             givers.append(GlobalDB.compressedUB[zcblock.users[i]])
+        #print('e')
+        #print()
         ledger.verify_join(givers, zcblock.amounts[:-1], zcblock.amounts[-1], output_list)
+        #print('f')
     else:
         raise Exception("Invalid transaction type: "+zcblock.transactionType)
 
@@ -122,7 +139,6 @@ def run(name, threadID):
             block = GlobalDB.UTP[choice]
             verify_transaction(block)
             #verifiedBlock = verifyNode(UTP[choice])
-            print(str(block))
             newnonce, curHash = verifyNode(block)
             
             if (newnonce is not None) and (curHash is not None):
@@ -136,9 +152,10 @@ def run(name, threadID):
                         try:
                             process_transaction(block)
                         except:
-                            print("damn it")
+                            #print("damn it")
                             pass
                         # print('processed...')
+                        # print("key length: "+str(len(block.outputBlock.keys)))
                         block.PW = curHash
                         block.nonce = newnonce
                         
@@ -146,7 +163,7 @@ def run(name, threadID):
                         GlobalDB.VTP.update(v)
                         # print("transaction processed")
                         tmp = [str(hex(k)) for k in GlobalDB.VTP.keys()]
-                        print(tmp)
+                        #print(tmp)
                         # VTP[verifiedBlock.transactionID] = verifiedBlock
                         # print("VTP updated")
                         # print(VTP[verifiedBlock.transactionID])
@@ -167,7 +184,7 @@ def run(name, threadID):
             pass
         
     while True:
-        print('time to print!!!')
+        #print('time to print!!!')
         if GlobalDB.printOrder == threadID:
             printChain(name, transactionChain)
             GlobalDB.printOrder += 1
@@ -176,13 +193,14 @@ def run(name, threadID):
 
 # TODO: Task II: Create Verifying Nodes
 def process_transaction(zcblock: ledger.ZCBLOCK):
-    print('processing -----'+zcblock.transactionType)
+    #print('processing -----'+zcblock.transactionType)
     output_list = []
     if zcblock.transactionType != "GENESIS":
         for output in zcblock.output_IDs[:-1]:
             #print("PROCESS")
             #print(type(output))
             output_list.append(GlobalDB.VTP[output].outputBlock)
+        output_list = [o for o in output_list if o is not None]
         if len(output_list) == 0:
             raise Exception("Number of incoming transactions must be greater than 0.")
 
@@ -206,10 +224,12 @@ def process_transaction(zcblock: ledger.ZCBLOCK):
     
     
 def printChain(name, transactionChain):
-    print(name + "'s Transaction Chain:")
+    print('\n\n'+name + "'s Transaction Chain:")
     temp = transactionChain
-    while temp != None:
-        print(temp)
-        temp = temp.prevs
+    for i in temp:
+        print(hex(i))
+    # while temp != None:
+    #     print(temp)
+    #     temp = temp.prevs
     print('---------------------------')
 

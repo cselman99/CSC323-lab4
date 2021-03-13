@@ -10,6 +10,7 @@ from GlobalDB import UTP
 from GlobalDB import VTP
 from GlobalDB import userbase
 from GlobalDB import compressedUB
+import sys
 # TODO: Task III: Transaction File
 
 # ! Object format:
@@ -56,34 +57,34 @@ def generateTransfers():
     t = ["", "", "", "", "", "", "", "", "", ""]
 
     types = ["GENESIS", "TRANSFER", "TRANSFER", "TRANSFER", "TRANSFER", \
-        "MERGE", "JOIN", "TRANSFER", "JOIN", "MERGE"]
+        "MERGE", "MERGE", "TRANSFER", "MERGE", "JOIN"]
 
     for b in range(10):
         sIndex = 0
         inputs = [
-            str(uk[0])+"::25",
-            str(uk[0])+":" + t[0] + ":15 " + str(uk[1])+"::15",
-            str(uk[1])+":" + t[1] + ":3 " + str(uk[2]) + "::3",
-            str(uk[2])+":" + t[2] + ":1 " + str(uk[3]) + "::1",
-            str(uk[0])+":" + t[1] + ":2.15 " + str(uk[3]) + "::2.15", 
-            str(uk[3])+":" + t[4] + ":2 " + str(uk[3]) + ":" + t[3] + ":1 " + str(uk[2]) + "::3",
-            str(uk[2])+":" + t[3] + ":2 " + str(uk[2]) + ":" + t[5] + ":2 " + str(uk[4]) + "::4",
-            str(uk[1])+":" + t[2] + ":6 " + str(uk[4]) + "::6",
-            str(uk[4])+":" + t[6] + ":4 " + str(uk[4]) + ":" + t[7] + ":6 " + str(uk[2]) + "::10",
-            str(uk[0])+":" + t[4] + ":7.85 " + str(uk[3]) + ":" + t[5] + ":0.15 " + str(uk[2]) + ":" + t[8] + ":10 " + str(uk[1]) + "::18"
+            str(uk[0])+"::25", # GENESIS
+            str(uk[0])+":" + t[0] + ":15 " + str(uk[1])+"::15", # TRANSFER
+            str(uk[1])+":" + t[1] + ":3 " + str(uk[2]) + "::3", # TRANSFER
+            str(uk[2])+":" + t[2] + ":1 " + str(uk[3]) + "::1", # TRANSFER
+            str(uk[0])+":" + t[1] + ":2.15 " + str(uk[3]) + "::2.15", # TRANSFER
+            str(uk[3])+":" + t[4] + ":2 " + str(uk[3]) + ":" + t[3] + ":1 " + str(uk[2]) + "::3", # MERGE
+            str(uk[2])+":" + t[3] + ":2 " + str(uk[2]) + ":" + t[5] + ":2 " + str(uk[4]) + "::4", # MERGE
+            str(uk[1])+":" + t[2] + ":6 " + str(uk[4]) + "::6", # TRANSFER
+            str(uk[4])+":" + t[6] + ":4 " + str(uk[4]) + ":" + t[7] + ":6 " + str(uk[2]) + "::10", # MERGE
+            str(uk[0])+":" + t[4] + ":7.85 " + str(uk[3]) + ":" + t[5] + ":0.15 " + str(uk[2]) + ":" + t[8] + ":10 " + str(uk[1]) + "::18" # JOIN
         ]
 
         outputs = [
-            "25:" + str(uk[0]), 
-            "15:" + str(uk[1]) + " 10:" + str(uk[0]), 
-            "3:" + str(uk[2]) + " 12:" + str(uk[1]), 
-            "1:" + str(uk[3]) + " 2:" + str(uk[2]),
-            "2.15:" + str(uk[3]) + " 7.85:" + str(uk[0]), 
-            "0.15:" + str(uk[3]) + " 3:" + str(uk[2]),
-            "4:" + str(uk[4]) + " 1:" + str(uk[2]),
-            "6:" + str(uk[4]) + " 6:" + str(uk[1]),
-            "10:" + str(uk[2]),
-            "18:" + str(uk[1])
+            "25:" + str(uk[0]), # GENESIS
+            "15:" + str(uk[1]) + " 10:" + str(uk[0]), # TRANSFER
+            "3:" + str(uk[2]) + " 12:" + str(uk[1]), # TRANSFER
+            "1:" + str(uk[3]) + " 2:" + str(uk[2]), # TRANSFER
+            "2.15:" + str(uk[3]) + " 7.85:" + str(uk[0]), # TRANSFER
+            "0.15:" + str(uk[3]) + " 3:" + str(uk[2]), # MERGE
+            "4:" + str(uk[4]) + " 1:" + str(uk[2]), # MERGE
+            "6:" + str(uk[4]) + " 6:" + str(uk[1]), # TRANSFER
+            "10:" + str(uk[2]), # MERGE
+            "18:" + str(uk[1]) # JOIN
             ]
         
         #endstate: uk[2] has 1 coin, uk[1] has 24 coins
@@ -177,6 +178,7 @@ def generateUTP(filename):
         
         # signatures
         signatures = flines[i+4].split(' ')
+
         if len(signatures) > 0 and signatures[0] != '':
             newZCBlock.signature = [int(sig, 16) for sig in signatures if sig != '']
         else:
@@ -193,10 +195,10 @@ def generateUTP(filename):
 
 
 def verify_transfer(giver: User, send_amount: float, prior_block: Output):
-    print('1')
-    print(giver.sk)
+    #print('1')
+    #print(giver.sk)
     total_amount = prior_block.check_value(giver.sk)
-    print('3')
+    #print('3')
     if total_amount == None:
         print('no amount')
         raise Exception("No funds for the user exist with this block.")
@@ -211,17 +213,35 @@ def run_transfer(giver: User, reciever: User, send_amount: float, prior_block: O
 
 def verify_merge(giver: User, send_amount: float, prior_blocks: list):
     total_amount = 0
-    for i in range(len(prior_blocks)):
-        total_amount += prior_blocks[i].check_value(giver.sk)
-    if total_amount < send_amount:
-        raise Exception("Insufficient funds")
+    #print(giver.sk)
+    #Searching for Private RSA key at 0x1FF1A5C4670 in [None, Private RSA key at 0x1FF1A518850:6.0, Private RSA key at 0x1FF1A5C4670:6.0]
+
+    try:
+        for i in range(len(prior_blocks)):
+            #print("Searching for", giver.sk, "in", prior_blocks)
+            total_amount += prior_blocks[i].check_value(giver.sk)
+        #print("h2")
+        if total_amount < send_amount:
+            #print("h3")
+            raise Exception("Insufficient funds")
+    except Exception as e:
+        tb = sys.exc_info()[2]
+        # print("EXCEPTION THROWN:\/")
+        # print(e.with_traceback(tb))
     
 def run_merge(giver: User, reciever: User, send_amount: float, prior_blocks: list):
+    #print("in run merge __________")
     total_amount = 0
-    for i in range(len(prior_blocks)):
-        total_amount += prior_blocks[i].get_value(giver.sk)
-    giver_output_amount = total_amount - send_amount
-    return Output([giver_output_amount, send_amount], [giver.sk, reciever.sk])
+    try:
+        for i in range(len(prior_blocks)):
+            #print("merge key length: "+str(len(prior_blocks[i].keys)))
+            total_amount += prior_blocks[i].get_value(giver.sk)
+        giver_output_amount = total_amount - send_amount
+        #print('leave run merge__________')
+        return Output([giver_output_amount, send_amount], [giver.sk, reciever.sk])
+    except Exception as e:
+        pass
+        #print('here')
 
 '''
 givers: list of identities
@@ -232,18 +252,32 @@ prior_blocs: 2d list- each item is a list of prior_blocks that each user will be
 def verify_join(givers: list, send_amounts: list, total_send_amount: float, prior_blocks: list):
     if sum(send_amounts) != total_send_amount:
         raise Exception("Unbalanced transfer of funds.")
-    remaining_amounts = [0]*len(givers)
+    #print('a')
+    # remaining_amounts = [0]*len(givers)
     actual_total_amount = 0
-    for giver in range(len(givers)):
+    for giver_num in range(len(givers)):
+        # giver_total = 0
         giver_total = 0
-        for pBlock in range(len(prior_blocks[giver])):
-            giver_total += prior_blocks[giver][pBlock].check_value(givers[giver].sk)
-        if giver_total < send_amounts[giver]:
-            raise Exception("Giver at index "+str(giver)+" has not provided the necessary funds.")
-        actual_total_amount += giver_total
-        remaining_amounts[giver] = giver_total - send_amounts[giver]
-    if actual_total_amount < total_send_amount:
-        raise Exception("Insufficent total funds provided")
+        try:
+            giver_total = prior_blocks[giver_num].check_value(givers[giver_num].sk)
+            #for pBlock in range(len(prior_blocks[giver])):
+                # giver_total += prior_blocks[giver][pBlock].check_value(givers[giver].sk)
+                # giver_total += prior_blocks[pBlock].check_value(givers[giver].sk)
+        except Exception as e:
+            tb = sys.exc_info()[2]
+            # print("EXCEPTION THROWN:\/")
+            # print(e.with_traceback(tb))
+        # print(giver_total)
+        # if giver_total < send_amounts[giver]:
+        #     print('d')
+        #     raise Exception("Giver at index "+str(giver)+" has not provided the necessary funds.")
+        if giver_total is not None: actual_total_amount += giver_total
+        # remaining_amounts[giver] = giver_total - send_amounts[giver]
+    # print(str(actual_total_amount), " < ", str(total_send_amount))
+    # if actual_total_amount < total_send_amount:
+    #     print('exception raised here')
+    #     raise Exception("Insufficent total funds provided")
+    #print('done')
 
 def run_join(givers: list, receiver: User, send_amounts: list, total_send_amount: float, prior_blocks: list):
     remaining_amounts = [0]*len(givers)
